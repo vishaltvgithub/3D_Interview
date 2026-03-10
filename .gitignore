@@ -1,0 +1,25 @@
+
+# Dependencies
+node_modules/
+venv/
+__pycache__/
+
+# Environment
+.env
+*.env
+
+# Logs and Temp files
+*.log
+*.txt
+test_chat.json
+test_node_chat.py
+
+# Media
+**/audios/*.wav
+**/audios/*.mp3
+**/audios/*.json
+**/audios/
+
+# Binaries (Usually too large for GitHub)
+# Use LFS if you need these, otherwise users should download them
+# Sona - BACKEND/bin/
