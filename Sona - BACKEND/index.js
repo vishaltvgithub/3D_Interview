@@ -213,8 +213,16 @@ app.post("/chat", async (req, res) => {
     const response = await axios.post(`${aiBackendUrl}/generate`, { prompt: userMessage });
     responseData = response.data.text;
   } catch (apiError) {
-    console.error("FastAPI Error:", apiError.message);
-    res.status(500).send({ error: "LLM Backend connection failed" });
+    console.error("❌ FastAPI Connection Failed!");
+    console.error("Target URL:", `${aiBackendUrl}/generate`);
+    console.error("Error Message:", apiError.message);
+    if (apiError.response) {
+      console.error("Response Data:", apiError.response.data);
+    }
+    res.status(500).send({ 
+      error: "LLM Backend connection failed",
+      details: apiError.message 
+    });
     return;
   }
 
