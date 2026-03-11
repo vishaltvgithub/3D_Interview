@@ -15,27 +15,12 @@ const voiceID = "CwhRBWXzGAHq8TQ4Fs17";
 const app = express();
 app.use(express.json());
 
-// CORS: allow Vercel frontend + localhost for dev
-const allowedOrigins = [
-  /^https:\/\/.*\.vercel\.app$/,   // any Vercel deployment
-  /^http:\/\/localhost(:\d+)?$/,    // local dev
-  /^http:\/\/127\.0\.0\.1(:\d+)?$/ // local dev alt
-];
+// CORS: Allow absolute connectivity between Vercel and Render
 app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (e.g. curl, Render health checks)
-    if (!origin) return callback(null, true);
-    const allowed = allowedOrigins.some(pattern => pattern.test(origin));
-    if (allowed) {
-      callback(null, true);
-    } else {
-      console.warn(`CORS blocked for origin: ${origin}`);
-      callback(null, true); // still allow but log — tighten in prod if needed
-    }
-  },
+  origin: "*",
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: false,
+  credentials: false
 }));
 
 const port = process.env.PORT || 3000;
