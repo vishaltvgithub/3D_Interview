@@ -14,9 +14,35 @@ const voiceID = "CwhRBWXzGAHq8TQ4Fs17";
 
 const app = express();
 app.use(express.json());
-app.use(cors());
+
+// CORS: allow Vercel frontend + localhost for dev
+const allowedOrigins = [
+  /^https:\/\/.*\.vercel\.app$/,   // any Vercel deployment
+  /^http:\/\/localhost(:\d+)?$/,    // local dev
+  /^http:\/\/127\.0\.0\.1(:\d+)?$/ // local dev alt
+];
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g. curl, Render health checks)
+    if (!origin) return callback(null, true);
+    const allowed = allowedOrigins.some(pattern => pattern.test(origin));
+    if (allowed) {
+      callback(null, true);
+    } else {
+      console.warn(`CORS blocked for origin: ${origin}`);
+      callback(null, true); // still allow but log — tighten in prod if needed
+    }
+  },
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: false,
+}));
+
 const port = process.env.PORT || 3000;
 const aiBackendUrl = process.env.AI_BACKEND_URL || 'http://127.0.0.1:8000';
+
+// Ensure audios directory exists on startup
+fs.mkdir('audios', { recursive: true }).catch(() => {});
 
 app.get("/", (req, res) => {
   res.send("Hello World!");
@@ -46,61 +72,128 @@ const execCommand = (command) => {
   });
 };
 
+// ---------------------------------------------------------------------------
+// Rhubarb binary resolver — handles the nested Linux path correctly
+// Actual Linux path: bin/rhubarb/rhubarb-lip-sync-1.13.0-linux/Rhubarb-Lip-Sync-1.13.0-Linux/rhubarb
+// ---------------------------------------------------------------------------
+const getRhubarbExecutable = async () => {
+  // Windows
+  const rhubarbPathWindows = path.join(process.cwd(), "bin", "rhubarb", "Rhubarb-Lip-Sync-1.14.0-Windows", "rhubarb.exe");
+  // Linux (the binary is nested one extra level inside the zip-extracted folder)
+  const rhubarbPathLinux = path.join(process.cwd(), "bin", "rhubarb", "rhubarb-lip-sync-1.13.0-linux", "Rhubarb-Lip-Sync-1.13.0-Linux", "rhubarb");
+  // macOS
+  const rhubarbPathMac = path.join(process.cwd(), "bin", "Rhubarb-Lip-Sync-1.13.0-macOS", "rhubarb");
+
+  if (process.platform === "win32") {
+    try { await fs.access(rhubarbPathWindows); return rhubarbPathWindows; } catch {}
+  } else {
+    // Try the correctly nested Linux path first
+    try { await fs.access(rhubarbPathLinux); return rhubarbPathLinux; } catch {}
+    try { await fs.access(rhubarbPathMac); return rhubarbPathMac; } catch {}
+  }
+
+  // Last resort: check if rhubarb is on PATH
+  try {
+    await execCommand("rhubarb --version");
+    return "rhubarb";
+  } catch {
+    return null; // not found anywhere
+  }
+};
+
+// ---------------------------------------------------------------------------
+// edge-tts resolver — finds the correct binary regardless of Python install path
+// ---------------------------------------------------------------------------
+let resolvedEdgeTts = null;
+const getEdgeTtsCommand = async () => {
+  if (resolvedEdgeTts) return resolvedEdgeTts;
+
+  // 1. Try system PATH (works if pip installed globally or venv is activated)
+  try {
+    const whichCmd = process.platform === 'win32' ? 'where edge-tts' : 'which edge-tts';
+    const result = (await execCommand(whichCmd)).trim().split('\n')[0].trim();
+    if (result) {
+      resolvedEdgeTts = `"${result}"`;
+      console.log(`edge-tts found at: ${result}`);
+      return resolvedEdgeTts;
+    }
+  } catch {}
+
+  // 2. Try using `python -m edge_tts` (always works if pip installed correctly)
+  try {
+    await execCommand('python3 -m edge_tts --version');
+    resolvedEdgeTts = 'python3 -m edge_tts';
+    console.log('edge-tts: using python3 -m edge_tts');
+    return resolvedEdgeTts;
+  } catch {}
+
+  try {
+    await execCommand('python -m edge_tts --version');
+    resolvedEdgeTts = 'python -m edge_tts';
+    console.log('edge-tts: using python -m edge_tts');
+    return resolvedEdgeTts;
+  } catch {}
+
+  // 3. Local venv fallbacks
+  const venvCmds = [
+    process.platform === 'win32' ? '.\\venv\\Scripts\\edge-tts' : './venv/bin/edge-tts',
+    '/opt/render/project/src/venv/bin/edge-tts',
+    '/usr/local/bin/edge-tts',
+    '/usr/bin/edge-tts',
+  ];
+  for (const cmd of venvCmds) {
+    try {
+      await fs.access(cmd.replace(/^"|"$/g, ''));
+      resolvedEdgeTts = `"${cmd}"`;
+      console.log(`edge-tts found at: ${cmd}`);
+      return resolvedEdgeTts;
+    } catch {}
+  }
+
+  return null; // not found
+};
+
+// Pre-resolve edge-tts path at startup
+getEdgeTtsCommand().then(cmd => {
+  if (!cmd) console.error('⚠️  WARNING: edge-tts not found. TTS will not work!');
+  else console.log(`✅ edge-tts resolved: ${cmd}`);
+});
+
 const lipSyncMessage = async (message) => {
   const mp3FileName = `audios/message_${message}.mp3`;
   const wavFileName = `audios/message_${message}.wav`;
   const jsonFileName = `audios/message_${message}.json`;
 
   try {
-    // Check if the MP3 file exists
+    // Check if the MP3 file exists before attempting conversion
     await fs.access(mp3FileName);
-    console.log(`Converting ${mp3FileName} to WAV`);
-    await execCommand(`"${ffmpegStatic}" -y -i ${mp3FileName} ${wavFileName}`);
-    console.log(`Conversion done`);
+    console.log(`Converting ${mp3FileName} to WAV for lip sync`);
+    // ffmpeg-static provides a static binary — works on all platforms including Render
+    await execCommand(`"${ffmpegStatic}" -y -i "${mp3FileName}" "${wavFileName}"`);
+    console.log(`WAV conversion done`);
 
-    // Check for Rhubarb binary (Windows or Mac)
-    const rhubarbPathWindows = path.join(process.cwd(), "bin", "rhubarb", "Rhubarb-Lip-Sync-1.14.0-Windows", "rhubarb.exe");
-    const rhubarbPathMac = path.join(process.cwd(), "bin", "Rhubarb-Lip-Sync-1.13.0-macOS", "rhubarb");
-    let rhubarbExecutable = rhubarbPathWindows;
-    const rhubarbPathLinux = path.join(process.cwd(), "bin", "rhubarb", "rhubarb-lip-sync-1.13.0-linux", "rhubarb");
+    const rhubarbExecutable = await getRhubarbExecutable();
+    if (!rhubarbExecutable) {
+      console.warn("⚠️  Rhubarb not found — writing empty mouthCues JSON");
+      await fs.writeFile(jsonFileName, JSON.stringify({ mouthCues: [] }));
+      return;
+    }
 
-    try {
-      if (process.platform === "win32") {
-        await fs.access(rhubarbPathWindows);
-        rhubarbExecutable = rhubarbPathWindows;
-      } else {
-        await fs.access(rhubarbPathLinux);
-        rhubarbExecutable = rhubarbPathLinux;
-      }
-    } catch {
-      try {
-        await fs.access(rhubarbPathMac);
-        rhubarbExecutable = rhubarbPathMac;
-      } catch {
-        // Fallback to searching in PATH if not found in bin
-        try {
-          await execCommand("rhubarb --version");
-          rhubarbExecutable = "rhubarb";
-        } catch {
-          console.warn("Rhubarb binary not found. Skipping lip sync generation.");
-          // Create a dummy JSON file so the frontend doesn't break
-          await fs.writeFile(jsonFileName, JSON.stringify({ mouthCues: [] }));
-          return;
-        }
-      }
+    // Make the binary executable on Linux/macOS (idempotent)
+    if (process.platform !== 'win32' && rhubarbExecutable !== 'rhubarb') {
+      try { await execCommand(`chmod +x "${rhubarbExecutable}"`); } catch {}
     }
 
     await execCommand(`"${rhubarbExecutable}" -f json -o "${jsonFileName}" "${wavFileName}" -r phonetic`);
-    console.log(`Lip sync done`);
+    console.log(`Lip sync JSON generated`);
   } catch (error) {
     if (error.code === 'ENOENT') {
       console.error(`Audio file not found: ${mp3FileName}`);
-      return { error: "Audio file not generated" };
     } else {
-      console.error("Error in lipSyncMessage:", error);
-      // Ensure a file exists preventing frontend crash
-      try { await fs.writeFile(jsonFileName, JSON.stringify({ mouthCues: [] })); } catch { }
+      console.error("Error in lipSyncMessage:", error.message);
     }
+    // Always write a fallback JSON so the frontend doesn't crash
+    try { await fs.writeFile(jsonFileName, JSON.stringify({ mouthCues: [] })); } catch {}
   }
 };
 
@@ -201,18 +294,25 @@ app.post("/chat", async (req, res) => {
       } catch (e) { }
 
       try {
-        // Using edge-tts CLI for Text to Speech
-        // Professional voice: en-US-AvaNeural (or en-US-EmmaNeural, en-GB-SoniaNeural)
-        const voice = "en-US-AvaNeural";
-        // In production (Linux), edge-tts is usually in the PATH after npm install (via python)
-        const edgeTtsCmd = process.env.NODE_ENV === 'production' ? 'edge-tts' : (process.platform === 'win32' ? '.\\venv\\Scripts\\edge-tts' : './venv/bin/edge-tts');
-        const safeText = textInput.replace(/[\\"$]/g, '\\$&').replace(/\n/g, ' ');
-        console.log(`[${i}] Executing TTS command: ${edgeTtsCmd} --text "${safeText.substring(0, 30)}..."`);
-        await execCommand(`${edgeTtsCmd} --text "${safeText}" --voice ${voice} --write-media ${fileName}`);
-        console.log(`[${i}] Audio generated via edge-tts at ${fileName}`);
-
+        // Using edge-tts for Text to Speech — dynamically resolve the binary
+        const ttsVoice = "en-US-AvaNeural";
+        const edgeTtsCmd = await getEdgeTtsCommand();
+        if (!edgeTtsCmd) {
+          throw new Error('edge-tts binary could not be located on this system');
+        }
+        // Safely escape the text for shell execution
+        const safeText = textInput
+          .replace(/\\/g, '\\\\')
+          .replace(/"/g, '\\"')
+          .replace(/\$/g, '\\$')
+          .replace(/`/g, '\\`')
+          .replace(/\n/g, ' ')
+          .replace(/\r/g, '');
+        console.log(`[${i}] TTS: ${edgeTtsCmd} --voice ${ttsVoice} --text "${safeText.substring(0, 40)}..."`);
+        await execCommand(`${edgeTtsCmd} --text "${safeText}" --voice ${ttsVoice} --write-media ${fileName}`);
+        console.log(`[${i}] ✅ Audio generated: ${fileName}`);
       } catch (voiceError) {
-        console.error(`[${i}] edge-tts Error:`, voiceError.message);
+        console.error(`[${i}] ❌ edge-tts Error:`, voiceError.message);
       }
 
       // generate lipsync

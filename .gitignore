@@ -4,9 +4,11 @@ node_modules/
 venv/
 __pycache__/
 
-# Environment
+# Environment - block secrets but allow templates
 .env
+.env.local
 *.env
+!*.env.example
 
 # Logs and Temp files
 *.log
@@ -14,11 +16,14 @@ __pycache__/
 test_chat.json
 test_node_chat.py
 
-# Media
+# Media - ignore temp generated files, but KEEP intro files needed for production
 **/audios/*.wav
-**/audios/*.mp3
-**/audios/*.json
-**/audios/
+**/audios/message_*.mp3
+**/audios/message_*.json
+**/audios/api_*.mp3
+**/audios/api_*.json
+# NOTE: intro_0.mp3, intro_1.mp3, intro_0.json, intro_1.json are KEPT in git
+# They are required for the welcome message on Render (no venv available at startup)
 
 # Binaries (Usually too large for GitHub)
 # Use LFS if you need these, otherwise users should download them

@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: sona-backend
+    env: docker
+    region: oregon
+    plan: free
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: AI_BACKEND_URL
+        value: http://127.0.0.1:8000

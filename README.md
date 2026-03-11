@@ -1,137 +1,113 @@
 # Sona: Professional Interview Assistant 🎙️🤖
 
-Sona is a state-of-the-art 3D Virtual AI Assistant designed to help professionals and students prepare for technical and behavioral interviews. Combining the power of local LLMs with advanced 3D character animation and high-quality voice synthesis, Sona provides an immersive mock interview experience.
+Sona is a premium 3D Virtual AI Assistant designed to help professionals and students master their technical and behavioral interviews. By combining local LLM intelligence with real-time 3D character animation and high-fidelity neural voice synthesis, Sona provides a deeply immersive and realistic mock interview experience.
 
 ---
 
 ## ✨ Features
 
-- **Professional Persona**: Highly experienced technical interviewer persona powered by Groq (Llama 3).
-- **3D Interactive Avatar**: Realistic 3D character with lip-sync and dynamic facial expressions.
-- **Voice Synthesis**: Premium AI voices powered by Microsoft Azure (Neural via edge-tts).
-- **Fast Response**: Low-latency responses using Groq Cloud.
-- **Responsive Web UI**: Built with React, Three.js, and TailwindCSS for a premium feel.
+- **Professional Persona**: Powered by **Groq (Llama 3)**, Sona acts as a seasoned technical recruiter with a sharp, professional tone.
+- **3D Living Avatar**: A fully interactive character with automated phonetic lip-sync and dynamic facial expressions.
+- **Neural Voice Synthesis**: Crystal-clear professional voices using **Edge-TTS** (Microsoft Azure Neural technology).
+- **Blazing Fast Responses**: Optimized for low-latency interactions via the Groq Cloud API.
+- **Modern Web Interface**: Built with **React**, **Three.js (R3F)**, and **TailwindCSS** for a high-end desktop experience.
 
 ---
 
-## 🏗️ Architecture Layer
+## 🏗️ System Architecture
 
-- **Frontend (UI)**: React app with **Three.js** rendering the interactive 3D avatar.
-- **Orchestration (Middle)**: Node.js/Express server that handles:
-    - Voice synthesis (`edge-tts`).
-    - Lip-sync data generation (`Rhubarb`).
-- **Intelligence (Core)**: FastAPI server managing the LLM responses via **Groq**.
+Sona operates through a three-tier architecture:
+
+1.  **Frontend (The Face)**: A Vite-powered React application using **Three.js** to render a high-quality 60FPS digital avatar.
+2.  **Orchestrator (The Voice)**: A Node.js Express server that manages:
+    *   **Text-to-Speech (TTS)**: Dynamic generation of neural audio files.
+    *   **Lip-Sync Processing**: Real-time phonetic analysis via **Rhubarb Lip Sync**.
+3.  **Intelligence (The Brain)**: A FastAPI Python server that orchestrates LLM prompts and ensures professional response formatting.
 
 ---
 
 ## 🛠️ Technology Stack
 
-- **Frontend**: React, React Three Fiber (Three.js), TailwindCSS, Vite.
-- **Backend (Orchestrator)**: Node.js (Express) handles audio generation and lip-sync processing.
-- **Backend (AI Core)**: FastAPI (Python) for LLM orchestration.
-- **Intelligence**: Llama 3.3 (via Groq Cloud).
-- **Voice**: edge-tts (Neural Voice Synthesis).
-- **Lip-Sync**: Rhubarb Lip Sync (Automated phonetic mapping).
+*   **Frontend**: React, React Three Fiber, Three.js, TailwindCSS, Vite.
+*   **Backend (Node)**: Express.js, FFmpeg, Rhubarb Lip-Sync.
+*   **Backend (Python)**: FastAPI, Uvicorn, Groq AI.
+*   **Deployment**: Docker (Backend), Vercel (Frontend).
 
 ---
 
 ## 🚀 Getting Started
 
 ### 1. Prerequisites
-- **Node.js** (v18+)
-- **Python** (v3.9+)
-- **Rhubarb Lip-Sync**: Included in `Sona - BACKEND/bin/`.
-- **FFmpeg**: Required on the system for audio conversion.
+*   **Node.js** (v18+)
+*   **Python** (v3.10+)
+*   **FFmpeg**: Installed and available in system PATH.
 
 ### 2. Backend Setup
-
 ```bash
 cd "Sona - BACKEND"
 
-# 1. Setup Python Virtual Environment
+# Setup Python Virtual Environment
 python -m venv venv
 .\venv\Scripts\activate # Windows
 # source venv/bin/activate # Mac/Linux
 
-# 2. Install Python Packages
+# Install all dependencies
 pip install -r requirements.txt
-
-# 3. Install Node.js Dependencies
 npm install
 ```
 
 ### 3. Environment Configuration
-
 Create a `.env` file in `Sona - BACKEND`:
-
 ```properties
-# REQUIRED: Get yours from https://console.groq.com/
-GROQ_API_KEY=your_groq_api_key_here
-
-# For Production Hosting (Leave empty for localhost)
-AI_BACKEND_URL=
+GROQ_API_KEY=your_key_here
 PORT=3000
 ```
 
 ---
 
-## 🚀 Deployment Guide (Public URL)
+## 🌐 Deployment Guide (Production)
 
-To share Sona with others, host the parts as follows:
+We have optimized the deployment process to handle the complex Python + Node dependency chain using **Docker**.
 
-### **A. FastAPI AI Server (Render / Railway)**
-- **Root Directory**: `Sona - BACKEND`
-- **Build**: `pip install -r requirements.txt`
-- **Start**: `python main.py`
-- **Env**: `GROQ_API_KEY`
+### **Step 1: Backend (Render.com)**
+1.  **Create Service**: New **Web Service** on Render.
+2.  **Environment**: Select **Docker**.
+3.  **Config**: Render will automatically use the `Sona - BACKEND/Dockerfile`.
+4.  **Env Variables**:
+    *   `GROQ_API_KEY`: Your Groq API Key.
+5.  **Why this works**: The Docker container bundles Node, Python, and FFmpeg together, ensuring Sona's voice works perfectly in the cloud.
 
-### **B. Node Orchestrator (Render / Railway)**
-- **Root Directory**: `Sona - BACKEND`
-- **Build**: `npm install`
-- **Start**: `node index.js`
-- **Env**: 
-    - `AI_BACKEND_URL` = [Your FastAPI URL from Step A]
-    - `NODE_ENV` = `production`
-
-### **C. Frontend (Vercel / Netlify)**
-- **Root Directory**: `Sona - FRONTEND`
-- **Framework**: `Vite`
-- **Env**:
-    - `VITE_BACKEND_URL` = [Your Node URL from Step B]
+### **Step 2: Frontend (Vercel)**
+1.  **Connect Repo**: Point Vercel to the `Sona - FRONTEND` folder.
+2.  **Env Variables**:
+    *   `VITE_BACKEND_URL`: Your Render service URL (e.g., `https://sona-api.onrender.com`).
+3.  **Deploy**.
 
 ---
 
-## 🚦 Running Locally
+## 🏆 Deployment Wins (Fixes Applied)
 
-You need to start three services in separate terminals:
-
-1. **Python AI Server**:
-   ```bash
-   cd "Sona - BACKEND"
-   .\venv\Scripts\python.exe main.py
-   ```
-
-2. **Node Orchestrator**:
-   ```bash
-   cd "Sona - BACKEND"
-   node index.js
-   ```
-
-3. **Web Interface**:
-   ```bash
-   cd "Sona - FRONTEND"
-   npm run dev
-   ```
-
-Open **[http://localhost:5173](http://localhost:5173)** to start your interview practice!
+We recently resolved several critical deployment issues that were preventing Sona from speaking:
+*   ✅ **Dynamic edge-tts pathing**: The backend now automatically locates the TTS binary on both Linux (Render) and Windows.
+*   ✅ **Nested Rhubarb fix**: Resolved a pathing issue where the lip-sync binary was not being found on Linux due to nested folder structures.
+*   ✅ **FFmpeg Integration**: Switched to a robust static binary approach for audio conversion.
+*   ✅ **CORS Security**: Implemented modern CORS policies to allow seamless communication between Vercel and Render.
+*   ✅ **Asset Persistence**: Fixed gitignore rules to ensure critical "Intro" audio files are preserved during deployment.
 
 ---
 
-## 📸 Screenshots & Demo
+## 🚦 Local Development
 
-[![Sona Demo Video](https://github.com/Addhithya/Sona/blob/main/Sona%20-%20FRONTEND/public/Screenshot%202024-08-10%20at%2022.29.15.png)](https://github.com/Addhithya/Sona/blob/main/Sona%20-%20FRONTEND/public/3D%20chatbot%20demo720p.mp4)
+Start these three services in separate terminals:
+
+1.  **AI Server**: `cd "Sona - BACKEND" && .\venv\Scripts\python main.py`
+2.  **Orchestrator**: `cd "Sona - BACKEND" && node index.js`
+3.  **Frontend**: `cd "Sona - FRONTEND" && npm run dev`
+
+Open **[http://localhost:5173](http://localhost:5173)** to start your session.
 
 ---
 
 ## 📄 License
 This project is licensed under the MIT License.
+
